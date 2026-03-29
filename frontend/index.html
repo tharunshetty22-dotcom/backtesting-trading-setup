@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Backtesting Platform</title>
+  <title>Backtesting Platform – MT5</title>
   <style>
     /* ------------------------------------------------------------------ */
     /* Reset & base                                                         */
@@ -73,6 +73,33 @@
     .card h2 .icon { font-size: 1.2rem; }
 
     /* ------------------------------------------------------------------ */
+    /* MT5 Status badge                                                     */
+    /* ------------------------------------------------------------------ */
+    .mt5-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: .82rem;
+      margin-bottom: 20px;
+    }
+    .mt5-status .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--yellow);
+      animation: pulse 2s infinite;
+    }
+    .mt5-status.connected .dot { background: var(--green); animation: none; }
+    .mt5-status.error .dot     { background: var(--red);   animation: none; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: .3; }
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Form                                                                 */
     /* ------------------------------------------------------------------ */
     .form-grid {
@@ -87,7 +114,7 @@
 
     label { font-size: .85rem; color: var(--muted); font-weight: 500; }
 
-    input[type="text"], input[type="number"], select {
+    input[type="text"], input[type="number"], input[type="date"], select {
       background: var(--surface2);
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -99,6 +126,12 @@
     input:focus, select:focus {
       outline: none;
       border-color: var(--accent);
+    }
+
+    /* date input calendar icon colour */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.7);
+      cursor: pointer;
     }
 
     /* ------------------------------------------------------------------ */
@@ -134,28 +167,6 @@
     }
 
     /* ------------------------------------------------------------------ */
-    /* Tabs for data source                                                 */
-    /* ------------------------------------------------------------------ */
-    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-    .tab-btn {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--muted);
-      cursor: pointer;
-      font-size: .9rem;
-      padding: 8px 18px;
-      transition: all .2s;
-    }
-    .tab-btn.active {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-    }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
-
-    /* ------------------------------------------------------------------ */
     /* Run button                                                           */
     /* ------------------------------------------------------------------ */
     .btn-run {
@@ -179,6 +190,24 @@
     /* Results                                                              */
     /* ------------------------------------------------------------------ */
     #results { display: none; }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .symbol-badge {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px 12px;
+      font-size: .85rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
 
     .metrics-grid {
       display: grid;
@@ -281,6 +310,20 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ------------------------------------------------------------------ */
+    /* Tip box                                                              */
+    /* ------------------------------------------------------------------ */
+    .tip-box {
+      background: rgba(79,124,255,.08);
+      border: 1px solid rgba(79,124,255,.25);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: .85rem;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+    .tip-box strong { color: var(--text); }
+
+    /* ------------------------------------------------------------------ */
     /* Footer note                                                          */
     /* ------------------------------------------------------------------ */
     .footer-note {
@@ -297,12 +340,24 @@
   <!-- Header -->
   <header>
     <h1>📈 Backtesting Platform</h1>
-    <p>Upload your Python strategy, choose a data source and run the backtest.</p>
+    <p>Connect to MetaTrader5, select a symbol &amp; timeframe, upload your strategy and run the backtest.</p>
   </header>
 
   <!-- ---- Configuration card ------------------------------------------ -->
   <div class="card">
     <h2><span class="icon">⚙️</span> Configuration</h2>
+
+    <!-- MT5 connection status -->
+    <div class="mt5-status" id="mt5Status">
+      <span class="dot"></span>
+      <span id="mt5StatusText">MT5: not connected</span>
+    </div>
+
+    <!-- Tip -->
+    <div class="tip-box">
+      <strong>Before running:</strong> Make sure your MetaTrader5 terminal is open and
+      Python integration is enabled (<em>Tools → Options → Expert Advisors → Allow DLL imports</em>).
+    </div>
 
     <!-- Strategy upload -->
     <div class="form-group full" style="margin-bottom:20px;">
@@ -317,46 +372,44 @@
       </div>
     </div>
 
-    <!-- Data source tabs -->
-    <label style="display:block;margin-bottom:10px;">Historical Data Source</label>
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="ticker">📡 Download (yfinance)</button>
-      <button class="tab-btn" data-tab="csv">📂 Upload CSV</button>
-    </div>
-
-    <div class="tab-panel active" id="panel-ticker">
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Ticker Symbol</label>
-          <input type="text" id="ticker" placeholder="e.g. AAPL, TSLA, BTC-USD" />
-        </div>
-        <div class="form-group">
-          <label>Period</label>
-          <select id="period">
-            <option value="6mo">6 months</option>
-            <option value="1y" selected>1 year</option>
-            <option value="2y">2 years</option>
-            <option value="5y">5 years</option>
-            <option value="max">Max</option>
-          </select>
-        </div>
+    <!-- MT5 symbol & timeframe -->
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Symbol</label>
+        <input type="text" id="symbol" placeholder="e.g. EURUSD, GBPUSD, XAUUSD"
+               value="EURUSD" list="symbolList" />
+        <datalist id="symbolList"></datalist>
+      </div>
+      <div class="form-group">
+        <label>Timeframe</label>
+        <select id="timeframe">
+          <option value="M1">M1 – 1 Minute</option>
+          <option value="M5">M5 – 5 Minutes</option>
+          <option value="M15">M15 – 15 Minutes</option>
+          <option value="M30">M30 – 30 Minutes</option>
+          <option value="H1" selected>H1 – 1 Hour</option>
+          <option value="H4">H4 – 4 Hours</option>
+          <option value="D1">D1 – Daily</option>
+          <option value="W1">W1 – Weekly</option>
+          <option value="MN">MN – Monthly</option>
+        </select>
       </div>
     </div>
 
-    <div class="tab-panel" id="panel-csv">
+    <!-- Date range -->
+    <div class="form-grid" style="margin-top:16px;">
       <div class="form-group">
-        <label>CSV File (with Date index + Close column)</label>
-        <div class="drop-zone" id="csvDropZone">
-          <input type="file" id="csvFile" accept=".csv" />
-          <div class="dz-icon">📊</div>
-          <div class="dz-label"><strong>Click to upload</strong> or drag &amp; drop</div>
-          <div class="file-name" id="csvFileName"></div>
-        </div>
+        <label>Start Date</label>
+        <input type="date" id="startDate" />
+      </div>
+      <div class="form-group">
+        <label>End Date</label>
+        <input type="date" id="endDate" />
       </div>
     </div>
 
     <!-- Capital / position size -->
-    <div class="form-grid" style="margin-top:20px;">
+    <div class="form-grid" style="margin-top:16px;">
       <div class="form-group">
         <label>Starting Capital ($)</label>
         <input type="number" id="capital" value="1000" min="1" />
@@ -375,7 +428,7 @@
   <!-- ---- Loader ------------------------------------------------------ -->
   <div class="loader" id="loader">
     <div class="spinner"></div>
-    Running backtest…
+    Connecting to MT5 and fetching historical data…
   </div>
 
   <!-- ---- Results ------------------------------------------------------ -->
@@ -383,7 +436,12 @@
 
     <!-- Summary cards -->
     <div class="card">
-      <h2><span class="icon">📊</span> Performance Summary</h2>
+      <div class="results-header">
+        <h2><span class="icon">📊</span> Performance Summary</h2>
+        <div>
+          <span class="symbol-badge" id="resultSymbol"></span>
+        </div>
+      </div>
       <div class="metrics-grid" id="metricsGrid"></div>
     </div>
 
@@ -409,19 +467,41 @@
 
 <script>
 /* ========================================================================
-   Tab switching
+   Initialise date pickers with sensible defaults
    ======================================================================== */
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-  });
-});
+(function initDates() {
+  const today = new Date();
+  const oneYearAgo = new Date(today);
+  oneYearAgo.setFullYear(today.getFullYear() - 1);
+
+  const toISO = d => d.toISOString().split('T')[0];
+  document.getElementById('endDate').value   = toISO(today);
+  document.getElementById('startDate').value = toISO(oneYearAgo);
+  document.getElementById('endDate').max     = toISO(today);
+})();
 
 /* ========================================================================
-   File drop zones
+   Load available MT5 symbols into the datalist
+   ======================================================================== */
+(async function loadSymbols() {
+  try {
+    const resp = await fetch('/api/symbols');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (data.symbols && data.symbols.length) {
+      const dl = document.getElementById('symbolList');
+      dl.innerHTML = data.symbols
+        .map(s => `<option value="${s}">`)
+        .join('');
+      setMt5Status('connected', `MT5: connected (${data.symbols.length} symbols)`);
+    }
+  } catch {
+    setMt5Status('error', 'MT5: terminal not available');
+  }
+})();
+
+/* ========================================================================
+   File drop zone
    ======================================================================== */
 function setupDropZone(zoneId, inputId, nameId) {
   const zone  = document.getElementById(zoneId);
@@ -443,8 +523,7 @@ function setupDropZone(zoneId, inputId, nameId) {
   });
 }
 
-setupDropZone('dropZone',    'strategyFile', 'fileName');
-setupDropZone('csvDropZone', 'csvFile',      'csvFileName');
+setupDropZone('dropZone', 'strategyFile', 'fileName');
 
 /* ========================================================================
    Form submission
@@ -454,7 +533,6 @@ document.getElementById('runBtn').addEventListener('click', runBacktest);
 async function runBacktest() {
   const strategyFile = document.getElementById('strategyFile').files[0];
   const errorBox = document.getElementById('formError');
-
   errorBox.style.display = 'none';
 
   if (!strategyFile) {
@@ -462,16 +540,13 @@ async function runBacktest() {
     return;
   }
 
-  const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
-  const ticker    = document.getElementById('ticker').value.trim();
-  const csvFile   = document.getElementById('csvFile').files[0];
+  const symbol    = document.getElementById('symbol').value.trim().toUpperCase();
+  const timeframe = document.getElementById('timeframe').value;
+  const startDate = document.getElementById('startDate').value;
+  const endDate   = document.getElementById('endDate').value;
 
-  if (activeTab === 'ticker' && !ticker) {
-    showError('Please enter a ticker symbol (e.g. AAPL).');
-    return;
-  }
-  if (activeTab === 'csv' && !csvFile) {
-    showError('Please upload a CSV file.');
+  if (!symbol) {
+    showError('Please enter a trading symbol (e.g. EURUSD).');
     return;
   }
 
@@ -480,15 +555,12 @@ async function runBacktest() {
 
   const fd = new FormData();
   fd.append('strategy',      strategyFile);
+  fd.append('symbol',        symbol);
+  fd.append('timeframe',     timeframe);
   fd.append('capital',       capital);
   fd.append('position_size', positionSize);
-
-  if (activeTab === 'ticker') {
-    fd.append('ticker', ticker);
-    fd.append('period', document.getElementById('period').value);
-  } else {
-    fd.append('csv_file', csvFile);
-  }
+  if (startDate) fd.append('start_date', startDate);
+  if (endDate)   fd.append('end_date',   endDate);
 
   setLoading(true);
 
@@ -501,7 +573,7 @@ async function runBacktest() {
     } else {
       renderResults(data);
     }
-  } catch (err) {
+  } catch {
     showError('Could not reach the server. Is the backend running?');
   } finally {
     setLoading(false);
@@ -512,6 +584,12 @@ async function runBacktest() {
    Render results
    ======================================================================== */
 function renderResults(d) {
+  // Symbol badge
+  const symbolLabel = d.symbol
+    ? `${d.symbol} · ${d.timeframe || ''}`
+    : '';
+  document.getElementById('resultSymbol').textContent = symbolLabel;
+
   // --- Summary cards ---
   const isPositive = d.net_pnl >= 0;
   const returnClass = isPositive ? 'positive' : 'negative';
@@ -536,6 +614,7 @@ function renderResults(d) {
 
   // --- Detail table ---
   const rows = [
+    ['Symbol',           d.symbol   ? `${d.symbol} (${d.timeframe})` : '–', ''],
     ['Starting Capital', fmtUSD(d.starting_capital), ''],
     ['Final Value',      fmtUSD(d.final_value),      d.final_value >= d.starting_capital ? 'pos' : 'neg'],
     ['Net P&L',          fmtUSD(d.net_pnl),          d.net_pnl >= 0 ? 'pos' : 'neg'],
@@ -575,6 +654,15 @@ function renderResults(d) {
 
   document.getElementById('results').style.display = 'block';
   document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+}
+
+/* ========================================================================
+   MT5 status badge
+   ======================================================================== */
+function setMt5Status(state, text) {
+  const el = document.getElementById('mt5Status');
+  el.className = 'mt5-status ' + state;
+  document.getElementById('mt5StatusText').textContent = text;
 }
 
 /* ========================================================================
