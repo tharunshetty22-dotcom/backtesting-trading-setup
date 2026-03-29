@@ -3,29 +3,36 @@ app.py – Flask REST API for the backtesting platform.
 
 Endpoints
 ---------
+GET  /api/symbols
+    Returns available trading symbols from the MT5 terminal.
+    Query param: group (optional) – wildcard filter, e.g. "*USD*"
+
 POST /api/backtest
     Accepts a multipart form with:
-      - strategy  : Python strategy file (.py)
-      - csv_file  : (optional) CSV file with OHLCV data
-      - ticker    : (optional) ticker symbol to download via yfinance
-      - period    : (optional) yfinance period, e.g. "1y" (default "1y")
-      - capital   : (optional) starting capital in USD (default 1000)
+      - strategy      : Python strategy file (.py)
+      - symbol        : Trading symbol, e.g. "EURUSD"
+      - timeframe     : Timeframe key, e.g. "H1" (default "H1")
+      - start_date    : ISO-8601 start date, e.g. "2023-01-01"
+      - end_date      : ISO-8601 end date,   e.g. "2024-01-01"
+      - capital       : (optional) starting capital in USD (default 1000)
       - position_size : (optional) % of capital per trade (default 100)
 
 GET /
     Serves the frontend HTML file.
 """
 
-import io
+import logging
 import os
+from datetime import datetime, timezone
 
-import pandas as pd
-import yfinance as yf
-from flask import Flask, jsonify, render_template_static, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
+
+logger = logging.getLogger(__name__)
 from flask_cors import CORS
-from werkzeug.utils import secure_filename
 
 from backtester import run_backtest
+from config import DEFAULT_CAPITAL, DEFAULT_POSITION_SIZE, DEFAULT_TIMEFRAME
+from mt5_connector import connect, disconnect, fetch_ohlcv, get_account_info, get_symbols
 from strategy_validator import StrategyValidationError, validate_strategy
 
 # ---------------------------------------------------------------------------
@@ -52,6 +59,21 @@ def index():
     return send_from_directory(FRONTEND_DIR, "index.html")
 
 
+@app.route("/api/symbols", methods=["GET"])
+def symbols():
+    """Return available symbols from the MT5 terminal."""
+    group = request.args.get("group", "").strip()
+    try:
+        if not connect():
+            return jsonify({"error": "Could not connect to MT5 terminal."}), 503
+        symbol_list = get_symbols(group=group)
+        return jsonify({"symbols": symbol_list})
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+    finally:
+        disconnect()
+
+
 @app.route("/api/backtest", methods=["POST"])
 def backtest():
     # ---- strategy file ------------------------------------------------
@@ -70,22 +92,47 @@ def backtest():
     except StrategyValidationError as exc:
         return jsonify({"error": str(exc)}), 422
 
-    # ---- load historical data ----------------------------------------
-    try:
-        df = _load_data(request)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+    # ---- MT5 parameters ---------------------------------------------
+    symbol = request.form.get("symbol", "").strip().upper()
+    timeframe = request.form.get("timeframe", DEFAULT_TIMEFRAME).strip().upper()
+    start_date_str = request.form.get("start_date", "").strip()
+    end_date_str = request.form.get("end_date", "").strip()
 
-    # ---- parameters --------------------------------------------------
+    if not symbol:
+        return jsonify({"error": "A trading symbol is required (e.g. 'EURUSD')."}), 400
+
+    start_date = _parse_date(start_date_str)
+    end_date = _parse_date(end_date_str)
+
+    # ---- backtest parameters -----------------------------------------
     try:
-        capital = float(request.form.get("capital", 1_000))
-        position_size = float(request.form.get("position_size", 100))
+        capital = float(request.form.get("capital", DEFAULT_CAPITAL))
+        position_size = float(request.form.get("position_size", DEFAULT_POSITION_SIZE))
         if capital <= 0:
             raise ValueError("Starting capital must be positive.")
         if not (1 <= position_size <= 100):
             raise ValueError("Position size must be between 1 and 100.")
     except (TypeError, ValueError) as exc:
         return jsonify({"error": str(exc)}), 400
+
+    # ---- connect to MT5 and fetch data --------------------------------
+    try:
+        if not connect():
+            return jsonify({"error": "Could not connect to MT5 terminal."}), 503
+
+        try:
+            df = fetch_ohlcv(
+                symbol=symbol,
+                timeframe=timeframe,
+                start=start_date,
+                end=end_date,
+            )
+        except (ValueError, RuntimeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
+    finally:
+        disconnect()
 
     # ---- run backtest ------------------------------------------------
     try:
@@ -97,6 +144,10 @@ def backtest():
         )
     except Exception as exc:  # noqa: BLE001
         return jsonify({"error": f"Backtest error: {exc}"}), 500
+
+    # Add context to results
+    results["symbol"] = symbol
+    results["timeframe"] = timeframe
 
     # Serialise the rating tuples to plain dicts for JSON
     rating = results.get("rating", {})
@@ -115,26 +166,18 @@ def _allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def _load_data(req) -> pd.DataFrame:
-    """Return a DataFrame from either an uploaded CSV or a yfinance download."""
-    csv_file = req.files.get("csv_file")
-    ticker = req.form.get("ticker", "").strip().upper()
-    period = req.form.get("period", "1y").strip()
-
-    if csv_file and csv_file.filename:
-        content = csv_file.read().decode("utf-8")
-        df = pd.read_csv(io.StringIO(content), index_col=0, parse_dates=True)
-        if df.empty:
-            raise ValueError("Uploaded CSV is empty.")
-        return df
-
-    if ticker:
-        df = yf.download(ticker, period=period, progress=False, auto_adjust=True)
-        if df is None or df.empty:
-            raise ValueError(f"No data returned for ticker '{ticker}'.")
-        return df
-
-    raise ValueError("Provide either a CSV file or a ticker symbol.")
+def _parse_date(date_str: str):
+    """Parse an ISO-8601 date string and return a timezone-aware datetime or None."""
+    if not date_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(date_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except ValueError:
+        logger.warning("Could not parse date string %r; ignoring.", date_str)
+        return None
 
 
 # ---------------------------------------------------------------------------
