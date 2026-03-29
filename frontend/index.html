@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backtesting Trading Platform</title>
+    <link rel="stylesheet" href="/frontend/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>📈 Backtesting Trading Platform</h1>
+            <p>Test your trading strategies with live MT5 data</p>
+            
+            <!-- MT5 Status -->
+            <div class="status-indicator">
+                <span id="mt5Status" class="status-dot"></span>
+                <span id="statusText">Checking MT5 connection...</span>
+            </div>
+        </header>
+
+        <!-- Main Form -->
+        <main class="main-content">
+            <form id="backtestForm" class="backtest-form">
+                
+                <!-- Strategy Code Input -->
+                <div class="form-section">
+                    <h2>📝 Strategy Code</h2>
+                    <div class="form-group">
+                        <label for="strategyCode">Enter Your Python Strategy:</label>
+                        <div class="code-editor-wrapper">
+                            <textarea 
+                                id="strategyCode" 
+                                placeholder="Paste your Python strategy code here or write it directly...
+
+Example:
+import pandas as pd
+
+def generate_signals(ohlc_data):
+    close = ohlc_data['Close'].values
+    sma_short = pd.Series(close).rolling(window=10).mean()
+    sma_long = pd.Series(close).rolling(window=20).mean()
+    
+    signals = []
+    for i in range(len(close)):
+        if i < 20:
+            signals.append(0)
+        elif sma_short.iloc[i] > sma_long.iloc[i]:
+            signals.append(1)  # BUY
+        else:
+            signals.append(-1)  # SELL
+    
+    return signals" 
+                                rows="15" 
+                                required
+                                class="code-textarea"></textarea>
+                        </div>
+                        <button type="button" id="loadSampleBtn" class="btn btn-secondary">Load Sample Strategy</button>
+                    </div>
+                </div>
+
+                <!-- Trading Parameters -->
+                <div class="form-section">
+                    <h2>⚙️ Trading Parameters</h2>
+                    
+                    <!-- Symbol Selection -->
+                    <div class="form-group">
+                        <label for="symbol">Trading Symbol:</label>
+                        <select id="symbol" required class="form-control">
+                            <option value="">-- Loading symbols from MT5... --</option>
+                        </select>
+                    </div>
+
+                    <!-- Timeframe Selection -->
+                    <div class="form-group">
+                        <label for="timeframe">Timeframe:</label>
+                        <select id="timeframe" required class="form-control">
+                            <option value="">-- Select Timeframe --</option>
+                            <option value="M1">M1 (1 Minute)</option>
+                            <option value="M5">M5 (5 Minutes)</option>
+                            <option value="M15">M15 (15 Minutes)</option>
+                            <option value="M30">M30 (30 Minutes)</option>
+                            <option value="H1">H1 (1 Hour)</option>
+                            <option value="H4">H4 (4 Hours)</option>
+                            <option value="D1">D1 (1 Day)</option>
+                            <option value="W1">W1 (1 Week)</option>
+                            <option value="MN">MN (1 Month)</option>
+                        </select>
+                    </div>
+
+                    <!-- Date Range -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="startDate">Start Date:</label>
+                            <input type="date" id="startDate" required class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="endDate">End Date:</label>
+                            <input type="date" id="endDate" required class="form-control">
+                        </div>
+                    </div>
+
+                    <!-- Capital and Position Size -->
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="initialCapital">Initial Capital ($):</label>
+                            <input type="number" id="initialCapital" value="1000" min="100" step="100" required class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="positionSize">Position Size (Lots):</label>
+                            <input type="number" id="positionSize" value="0.01" min="0.01" step="0.01" required class="form-control">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="form-actions">
+                    <button type="submit" id="runBtn" class="btn btn-primary">▶️ Run Backtest</button>
+                    <button type="reset" class="btn btn-secondary">🔄 Clear Form</button>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Running backtest... Please wait</p>
+                </div>
+            </form>
+
+            <!-- Results Section -->
+            <section id="resultsSection" class="results-section" style="display: none;">
+                <h2>📊 Backtest Results</h2>
+                
+                <div id="resultsContent" class="results-content">
+                    <!-- Results will be populated here -->
+                </div>
+
+                <div class="results-actions">
+                    <button id="downloadBtn" class="btn btn-secondary">📥 Download Results</button>
+                    <button id="newBacktestBtn" class="btn btn-primary">🔄 New Backtest</button>
+                </div>
+            </section>
+
+            <!-- Error Section -->
+            <section id="errorSection" class="error-section" style="display: none;">
+                <h3>⚠️ Error</h3>
+                <p id="errorMessage"></p>
+                <button id="closeErrorBtn" class="btn btn-secondary">Close</button>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>© 2024 Backtesting Trading Platform | Powered by MT5 & Flask</p>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/frontend/script.js"></script>
+</body>
+</html>
