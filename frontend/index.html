@@ -3,309 +3,32 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Backtesting Platform</title>
-  <style>
-    /* ------------------------------------------------------------------ */
-    /* Reset & base                                                         */
-    /* ------------------------------------------------------------------ */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:        #0f1117;
-      --surface:   #1a1d27;
-      --surface2:  #22263a;
-      --border:    #2e3350;
-      --accent:    #4f7cff;
-      --accent2:   #6c47ff;
-      --green:     #22c55e;
-      --red:       #ef4444;
-      --yellow:    #f59e0b;
-      --text:      #e2e8f0;
-      --muted:     #8892b0;
-      --radius:    12px;
-    }
-
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 24px 16px;
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* Layout                                                               */
-    /* ------------------------------------------------------------------ */
-    .container { max-width: 900px; margin: 0 auto; }
-
-    header {
-      text-align: center;
-      margin-bottom: 40px;
-    }
-    header h1 {
-      font-size: 2rem;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 6px;
-    }
-    header p { color: var(--muted); font-size: .95rem; }
-
-    /* ------------------------------------------------------------------ */
-    /* Card                                                                 */
-    /* ------------------------------------------------------------------ */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 28px;
-      margin-bottom: 28px;
-    }
-    .card h2 {
-      font-size: 1.1rem;
-      color: var(--text);
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .card h2 .icon { font-size: 1.2rem; }
-
-    /* ------------------------------------------------------------------ */
-    /* Form                                                                 */
-    /* ------------------------------------------------------------------ */
-    .form-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
-
-    .form-group { display: flex; flex-direction: column; gap: 6px; }
-    .form-group.full { grid-column: 1 / -1; }
-
-    label { font-size: .85rem; color: var(--muted); font-weight: 500; }
-
-    input[type="text"], input[type="number"], select {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      padding: 10px 12px;
-      font-size: .95rem;
-      transition: border-color .2s;
-    }
-    input:focus, select:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* File drop zone                                                       */
-    /* ------------------------------------------------------------------ */
-    .drop-zone {
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
-      padding: 32px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color .2s, background .2s;
-      position: relative;
-    }
-    .drop-zone:hover, .drop-zone.dragover {
-      border-color: var(--accent);
-      background: rgba(79, 124, 255, .06);
-    }
-    .drop-zone input[type="file"] {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-    }
-    .drop-zone .dz-icon { font-size: 2rem; margin-bottom: 8px; }
-    .drop-zone .dz-label { color: var(--muted); font-size: .9rem; }
-    .drop-zone .dz-label strong { color: var(--accent); }
-    .drop-zone .file-name {
-      margin-top: 10px;
-      font-size: .85rem;
-      color: var(--green);
-      font-weight: 500;
-    }
-
-    /* ------------------------------------------------------------------ */
-    /* Tabs for data source                                                 */
-    /* ------------------------------------------------------------------ */
-    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-    .tab-btn {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--muted);
-      cursor: pointer;
-      font-size: .9rem;
-      padding: 8px 18px;
-      transition: all .2s;
-    }
-    .tab-btn.active {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-    }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
-
-    /* ------------------------------------------------------------------ */
-    /* Run button                                                           */
-    /* ------------------------------------------------------------------ */
-    .btn-run {
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border: none;
-      border-radius: 10px;
-      color: #fff;
-      cursor: pointer;
-      font-size: 1rem;
-      font-weight: 600;
-      padding: 14px 32px;
-      width: 100%;
-      margin-top: 8px;
-      transition: opacity .2s, transform .1s;
-    }
-    .btn-run:hover { opacity: .9; }
-    .btn-run:active { transform: scale(.99); }
-    .btn-run:disabled { opacity: .5; cursor: not-allowed; }
-
-    /* ------------------------------------------------------------------ */
-    /* Results                                                              */
-    /* ------------------------------------------------------------------ */
-    #results { display: none; }
-
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .metric-card {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 18px;
-      text-align: center;
-    }
-    .metric-card .m-label {
-      font-size: .78rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      margin-bottom: 6px;
-    }
-    .metric-card .m-value {
-      font-size: 1.5rem;
-      font-weight: 700;
-    }
-    .metric-card.positive .m-value { color: var(--green); }
-    .metric-card.negative .m-value { color: var(--red); }
-    .metric-card.neutral  .m-value { color: var(--text); }
-
-    /* ------------------------------------------------------------------ */
-    /* Detail table                                                         */
-    /* ------------------------------------------------------------------ */
-    .results-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: .93rem;
-    }
-    .results-table td {
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--border);
-    }
-    .results-table tr:last-child td { border-bottom: none; }
-    .results-table .tl { color: var(--muted); width: 50%; }
-    .results-table .tr { font-weight: 600; text-align: right; }
-    .results-table .pos { color: var(--green); }
-    .results-table .neg { color: var(--red); }
-
-    /* ------------------------------------------------------------------ */
-    /* Strategy rating                                                      */
-    /* ------------------------------------------------------------------ */
-    .rating-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 12px;
-    }
-    .rating-item {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px 18px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .rating-item .ri-icon { font-size: 1.4rem; }
-    .rating-item .ri-info { display: flex; flex-direction: column; }
-    .rating-item .ri-name { font-size: .78rem; color: var(--muted); }
-    .rating-item .ri-label { font-size: .95rem; font-weight: 600; }
-    .rating-item.pass .ri-label { color: var(--green); }
-    .rating-item.fail .ri-label { color: var(--red); }
-
-    /* ------------------------------------------------------------------ */
-    /* Error / loader                                                       */
-    /* ------------------------------------------------------------------ */
-    .error-box {
-      background: rgba(239,68,68,.1);
-      border: 1px solid rgba(239,68,68,.4);
-      border-radius: var(--radius);
-      color: var(--red);
-      padding: 14px 18px;
-      margin-top: 16px;
-      display: none;
-    }
-    .loader {
-      display: none;
-      text-align: center;
-      padding: 20px;
-      color: var(--muted);
-    }
-    .spinner {
-      border: 3px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      width: 28px;
-      height: 28px;
-      animation: spin .8s linear infinite;
-      margin: 0 auto 10px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ------------------------------------------------------------------ */
-    /* Footer note                                                          */
-    /* ------------------------------------------------------------------ */
-    .footer-note {
-      text-align: center;
-      color: var(--muted);
-      font-size: .8rem;
-      margin-top: 40px;
-    }
-  </style>
+  <title>MT5 Backtesting Platform</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 <div class="container">
 
   <!-- Header -->
   <header>
-    <h1>📈 Backtesting Platform</h1>
-    <p>Upload your Python strategy, choose a data source and run the backtest.</p>
+    <h1>📈 MT5 Backtesting Platform</h1>
+    <p>Connect MetaTrader5, upload your Python strategy and run a backtest on live broker data.</p>
   </header>
+
+  <!-- MT5 Status bar -->
+  <div class="status-bar">
+    <div class="status-dot checking" id="statusDot"></div>
+    <span class="status-text" id="statusText">Connecting to MT5…</span>
+    <span class="status-detail" id="statusDetail"></span>
+    <button class="btn-refresh" id="refreshStatus">↻ Refresh</button>
+  </div>
 
   <!-- ---- Configuration card ------------------------------------------ -->
   <div class="card">
     <h2><span class="icon">⚙️</span> Configuration</h2>
 
     <!-- Strategy upload -->
-    <div class="form-group full" style="margin-bottom:20px;">
+    <div class="form-group" style="margin-bottom:20px;">
       <label>Strategy File (.py)</label>
       <div class="drop-zone" id="dropZone">
         <input type="file" id="strategyFile" accept=".py" />
@@ -317,46 +40,45 @@
       </div>
     </div>
 
-    <!-- Data source tabs -->
-    <label style="display:block;margin-bottom:10px;">Historical Data Source</label>
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="ticker">📡 Download (yfinance)</button>
-      <button class="tab-btn" data-tab="csv">📂 Upload CSV</button>
-    </div>
-
-    <div class="tab-panel active" id="panel-ticker">
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Ticker Symbol</label>
-          <input type="text" id="ticker" placeholder="e.g. AAPL, TSLA, BTC-USD" />
+    <!-- Symbol & Timeframe -->
+    <div class="form-grid" style="margin-bottom:16px;">
+      <div class="form-group">
+        <label>Trading Symbol</label>
+        <select id="symbol"></select>
+        <div id="symbolInputWrap" style="display:none;margin-top:6px;">
+          <input type="text" id="symbolInput" placeholder="Type symbol manually, e.g. EURUSD" />
         </div>
-        <div class="form-group">
-          <label>Period</label>
-          <select id="period">
-            <option value="6mo">6 months</option>
-            <option value="1y" selected>1 year</option>
-            <option value="2y">2 years</option>
-            <option value="5y">5 years</option>
-            <option value="max">Max</option>
-          </select>
-        </div>
+      </div>
+      <div class="form-group">
+        <label>Timeframe</label>
+        <select id="timeframe">
+          <option value="M1">M1 – 1 Minute</option>
+          <option value="M5">M5 – 5 Minutes</option>
+          <option value="M15">M15 – 15 Minutes</option>
+          <option value="M30">M30 – 30 Minutes</option>
+          <option value="H1" selected>H1 – 1 Hour</option>
+          <option value="H4">H4 – 4 Hours</option>
+          <option value="D1">D1 – Daily</option>
+          <option value="W1">W1 – Weekly</option>
+          <option value="MN">MN – Monthly</option>
+        </select>
       </div>
     </div>
 
-    <div class="tab-panel" id="panel-csv">
+    <!-- Date range -->
+    <div class="form-grid" style="margin-bottom:16px;">
       <div class="form-group">
-        <label>CSV File (with Date index + Close column)</label>
-        <div class="drop-zone" id="csvDropZone">
-          <input type="file" id="csvFile" accept=".csv" />
-          <div class="dz-icon">📊</div>
-          <div class="dz-label"><strong>Click to upload</strong> or drag &amp; drop</div>
-          <div class="file-name" id="csvFileName"></div>
-        </div>
+        <label>Start Date</label>
+        <input type="date" id="startDate" />
+      </div>
+      <div class="form-group">
+        <label>End Date</label>
+        <input type="date" id="endDate" />
       </div>
     </div>
 
     <!-- Capital / position size -->
-    <div class="form-grid" style="margin-top:20px;">
+    <div class="form-grid">
       <div class="form-group">
         <label>Starting Capital ($)</label>
         <input type="number" id="capital" value="1000" min="1" />
@@ -375,11 +97,14 @@
   <!-- ---- Loader ------------------------------------------------------ -->
   <div class="loader" id="loader">
     <div class="spinner"></div>
-    Running backtest…
+    Fetching MT5 data and running backtest…
   </div>
 
   <!-- ---- Results ------------------------------------------------------ -->
   <div id="results">
+
+    <!-- Run context badges -->
+    <div class="run-context" id="runContext"></div>
 
     <!-- Summary cards -->
     <div class="card">
@@ -407,199 +132,6 @@
 
 </div><!-- /.container -->
 
-<script>
-/* ========================================================================
-   Tab switching
-   ======================================================================== */
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-  });
-});
-
-/* ========================================================================
-   File drop zones
-   ======================================================================== */
-function setupDropZone(zoneId, inputId, nameId) {
-  const zone  = document.getElementById(zoneId);
-  const input = document.getElementById(inputId);
-  const name  = document.getElementById(nameId);
-
-  input.addEventListener('change', () => {
-    if (input.files[0]) name.textContent = '✓ ' + input.files[0].name;
-  });
-  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
-  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
-  zone.addEventListener('drop', e => {
-    e.preventDefault();
-    zone.classList.remove('dragover');
-    if (e.dataTransfer.files[0]) {
-      input.files = e.dataTransfer.files;
-      name.textContent = '✓ ' + e.dataTransfer.files[0].name;
-    }
-  });
-}
-
-setupDropZone('dropZone',    'strategyFile', 'fileName');
-setupDropZone('csvDropZone', 'csvFile',      'csvFileName');
-
-/* ========================================================================
-   Form submission
-   ======================================================================== */
-document.getElementById('runBtn').addEventListener('click', runBacktest);
-
-async function runBacktest() {
-  const strategyFile = document.getElementById('strategyFile').files[0];
-  const errorBox = document.getElementById('formError');
-
-  errorBox.style.display = 'none';
-
-  if (!strategyFile) {
-    showError('Please upload a strategy .py file.');
-    return;
-  }
-
-  const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
-  const ticker    = document.getElementById('ticker').value.trim();
-  const csvFile   = document.getElementById('csvFile').files[0];
-
-  if (activeTab === 'ticker' && !ticker) {
-    showError('Please enter a ticker symbol (e.g. AAPL).');
-    return;
-  }
-  if (activeTab === 'csv' && !csvFile) {
-    showError('Please upload a CSV file.');
-    return;
-  }
-
-  const capital      = parseFloat(document.getElementById('capital').value) || 1000;
-  const positionSize = parseFloat(document.getElementById('positionSize').value) || 100;
-
-  const fd = new FormData();
-  fd.append('strategy',      strategyFile);
-  fd.append('capital',       capital);
-  fd.append('position_size', positionSize);
-
-  if (activeTab === 'ticker') {
-    fd.append('ticker', ticker);
-    fd.append('period', document.getElementById('period').value);
-  } else {
-    fd.append('csv_file', csvFile);
-  }
-
-  setLoading(true);
-
-  try {
-    const resp = await fetch('/api/backtest', { method: 'POST', body: fd });
-    const data = await resp.json();
-
-    if (!resp.ok || data.error) {
-      showError(data.error || 'An unexpected error occurred.');
-    } else {
-      renderResults(data);
-    }
-  } catch (err) {
-    showError('Could not reach the server. Is the backend running?');
-  } finally {
-    setLoading(false);
-  }
-}
-
-/* ========================================================================
-   Render results
-   ======================================================================== */
-function renderResults(d) {
-  // --- Summary cards ---
-  const isPositive = d.net_pnl >= 0;
-  const returnClass = isPositive ? 'positive' : 'negative';
-
-  const cards = [
-    { label: 'Total Return',    value: fmt(d.total_return,   '%'),   cls: returnClass },
-    { label: 'Net P&L',         value: fmtUSD(d.net_pnl),           cls: returnClass },
-    { label: 'Final Value',     value: fmtUSD(d.final_value),        cls: 'neutral'   },
-    { label: 'Win Rate',        value: fmt(d.win_rate,       '%'),   cls: d.win_rate >= 50 ? 'positive' : 'negative' },
-    { label: 'Total Trades',    value: d.total_trades,               cls: 'neutral'   },
-    { label: 'Sharpe Ratio',    value: d.sharpe_ratio.toFixed(2),    cls: d.sharpe_ratio >= 0.5 ? 'positive' : 'negative' },
-    { label: 'Max Drawdown',    value: fmt(d.max_drawdown,   '%'),   cls: d.max_drawdown <= 20 ? 'positive' : 'negative' },
-    { label: 'Wins / Losses',   value: `${d.wins} / ${d.losses}`,   cls: 'neutral'   },
-  ];
-
-  const grid = document.getElementById('metricsGrid');
-  grid.innerHTML = cards.map(c => `
-    <div class="metric-card ${c.cls}">
-      <div class="m-label">${c.label}</div>
-      <div class="m-value">${c.value}</div>
-    </div>`).join('');
-
-  // --- Detail table ---
-  const rows = [
-    ['Starting Capital', fmtUSD(d.starting_capital), ''],
-    ['Final Value',      fmtUSD(d.final_value),      d.final_value >= d.starting_capital ? 'pos' : 'neg'],
-    ['Net P&L',          fmtUSD(d.net_pnl),          d.net_pnl >= 0 ? 'pos' : 'neg'],
-    ['Total Return',     fmt(d.total_return, '%'),    d.total_return >= 0 ? 'pos' : 'neg'],
-    ['Total Trades',     d.total_trades,              ''],
-    ['Won / Lost',       `${d.wins} / ${d.losses}`,  ''],
-    ['Win Rate',         fmt(d.win_rate, '%'),        d.win_rate >= 50 ? 'pos' : 'neg'],
-    ['Sharpe Ratio',     d.sharpe_ratio.toFixed(2),   d.sharpe_ratio >= 0.5 ? 'pos' : 'neg'],
-    ['Max Drawdown',     fmt(d.max_drawdown, '%'),    d.max_drawdown <= 20 ? 'pos' : 'neg'],
-  ];
-
-  document.getElementById('detailTable').innerHTML =
-    rows.map(([label, val, cls]) =>
-      `<tr><td class="tl">${label}</td><td class="tr ${cls}">${val}</td></tr>`
-    ).join('');
-
-  // --- Rating ---
-  const ratingLabels = {
-    return:   'Return',
-    win_rate: 'Win Rate',
-    drawdown: 'Drawdown',
-    sharpe:   'Sharpe',
-  };
-
-  const ratingGrid = document.getElementById('ratingGrid');
-  ratingGrid.innerHTML = Object.entries(d.rating).map(([key, info]) => {
-    const pass = info.icon === '✓';
-    return `
-      <div class="rating-item ${pass ? 'pass' : 'fail'}">
-        <span class="ri-icon">${pass ? '✅' : '❌'}</span>
-        <div class="ri-info">
-          <span class="ri-name">${ratingLabels[key] || key}</span>
-          <span class="ri-label">${info.label}</span>
-        </div>
-      </div>`;
-  }).join('');
-
-  document.getElementById('results').style.display = 'block';
-  document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
-}
-
-/* ========================================================================
-   Utilities
-   ======================================================================== */
-function fmtUSD(val) {
-  const sign = val < 0 ? '-' : '';
-  return sign + '$' + Math.abs(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function fmt(val, suffix) {
-  return val.toFixed(2) + suffix;
-}
-
-function showError(msg) {
-  const box = document.getElementById('formError');
-  box.textContent = '⚠️ ' + msg;
-  box.style.display = 'block';
-}
-
-function setLoading(on) {
-  document.getElementById('loader').style.display = on ? 'block' : 'none';
-  document.getElementById('runBtn').disabled = on;
-  if (on) document.getElementById('results').style.display = 'none';
-}
-</script>
+<script src="script.js"></script>
 </body>
 </html>
